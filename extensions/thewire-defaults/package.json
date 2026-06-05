@@ -1,0 +1,29 @@
+{
+  "name": "thewire-defaults",
+  "displayName": "TheWire Defaults",
+  "description": "Default settings and configuration for TheWire.",
+  "version": "1.0.0",
+  "publisher": "thewire",
+  "license": "MIT",
+  "engines": {
+    "vscode": "*"
+  },
+  "categories": [
+    "Other"
+  ],
+  "contributes": {
+    "configurationDefaults": {
+      "telemetry.telemetryLevel": "off",
+      "telemetry.feedback.enabled": false,
+      "update.showReleaseNotes": false,
+      "workbench.startupEditor": "welcomePage",
+      "files.trimTrailingWhitespace": true,
+      "files.insertFinalNewline": true,
+      "editor.renderWhitespace": "selection"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Anzigar/thewire.git"
+  }
+}
