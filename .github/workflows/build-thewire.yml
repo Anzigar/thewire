@@ -1,0 +1,142 @@
+name: Build TheWire (Linux x64)
+
+# Produces a runnable TheWire build for Linux x64:
+#   - a portable .tar.gz of the app (extract & run ./bin/thewire)
+#   - a .deb package (sudo apt install ./thewire-*.deb, then run `thewire`)
+#
+# This runs on GitHub-hosted runners which have full network access, so the
+# Electron headers / binaries that the sandboxed web environment cannot reach
+# (electronjs.org returns 403 there) download normally here.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/code-review-Adp1z
+
+permissions:
+  contents: read
+
+jobs:
+  build-linux-x64:
+    name: Build TheWire (linux-x64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      NPM_ARCH: x64
+      VSCODE_ARCH: x64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install system build dependencies
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            pkg-config \
+            fakeroot \
+            dpkg-dev \
+            libx11-dev \
+            libxkbfile-dev \
+            libsecret-1-dev \
+            libkrb5-dev \
+            libnss3 \
+            libgtk-3-0 \
+            libgbm1 \
+            libasound2t64
+
+      - name: Install build/ dependencies
+        working-directory: build
+        run: |
+          set -e
+          for i in {1..5}; do
+            npm ci && break
+            [ $i -eq 5 ] && { echo "npm ci (build) failed too many times" >&2; exit 1; }
+            echo "npm ci (build) attempt $i failed, retrying..."
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install root dependencies
+        run: |
+          set -e
+          for i in {1..5}; do
+            npm ci && break
+            [ $i -eq 5 ] && { echo "npm ci (root) failed too many times" >&2; exit 1; }
+            echo "npm ci (root) attempt $i failed, retrying..."
+          done
+        env:
+          npm_config_arch: ${{ env.NPM_ARCH }}
+          VSCODE_ARCH: ${{ env.VSCODE_ARCH }}
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download built-in extensions
+        run: node build/lib/builtInExtensions.ts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compile (core-ci)
+        run: npm run gulp core-ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download Electron
+        run: |
+          set -e
+          for i in {1..3}; do
+            npm exec -- npm-run-all2 -lp "electron ${VSCODE_ARCH}" && break
+            [ $i -eq 3 ] && { echo "Electron download failed too many times" >&2; exit 1; }
+            echo "Electron download attempt $i failed, retrying..."
+            sleep 5
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build client (vscode-linux-x64-min-ci)
+        run: npm run gulp vscode-linux-${VSCODE_ARCH}-min-ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package portable tarball
+        run: |
+          set -e
+          OUT_DIR="$(dirname "$GITHUB_WORKSPACE")/VSCode-linux-${VSCODE_ARCH}"
+          echo "App built at: $OUT_DIR"
+          ls -la "$OUT_DIR"
+          mkdir -p "$GITHUB_WORKSPACE/.artifacts"
+          tar -czf "$GITHUB_WORKSPACE/.artifacts/thewire-linux-${VSCODE_ARCH}.tar.gz" \
+            -C "$(dirname "$OUT_DIR")" "VSCode-linux-${VSCODE_ARCH}"
+
+      - name: Build .deb package
+        run: |
+          set -e
+          npm run gulp "vscode-linux-${VSCODE_ARCH}-prepare-deb"
+          npm run gulp "vscode-linux-${VSCODE_ARCH}-build-deb"
+          mkdir -p "$GITHUB_WORKSPACE/.artifacts"
+          find .build/linux/deb -name '*.deb' -exec cp {} "$GITHUB_WORKSPACE/.artifacts/" \;
+          ls -la "$GITHUB_WORKSPACE/.artifacts"
+
+      - name: Upload portable tarball
+        uses: actions/upload-artifact@v7
+        with:
+          name: thewire-linux-x64-portable
+          path: .artifacts/thewire-linux-x64.tar.gz
+          if-no-files-found: error
+
+      - name: Upload .deb package
+        uses: actions/upload-artifact@v7
+        with:
+          name: thewire-linux-x64-deb
+          path: .artifacts/*.deb
+          if-no-files-found: warn
