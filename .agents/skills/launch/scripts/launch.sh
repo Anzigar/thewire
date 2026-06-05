@@ -30,7 +30,7 @@ set -euo pipefail
 umask 077
 
 AGENTS=0
-SOURCE_UDD="${CODE_OSS_DEV_AUTHED_USER_DATA_DIR:-$HOME/.vscode-oss-dev}"
+SOURCE_UDD="${CODE_OSS_DEV_AUTHED_USER_DATA_DIR:-$HOME/.thewire-dev}"
 REPO=""
 EXTRA_ARGS=()
 CLONE_EXTENSIONS=0
@@ -77,7 +77,7 @@ MAIN_PORT=$(pick_port)
 AGENTHOST_PORT=$(pick_port)
 
 STAMP=$(date +%Y%m%d-%H%M%S)-$$
-RUN_DIR="${TMPDIR:-/tmp}/code-oss-dev/$STAMP"
+RUN_DIR="${TMPDIR:-/tmp}/thewire-dev/$STAMP"
 DEST_UDD="$RUN_DIR/user-data"
 SHARED_DATA_DIR="$RUN_DIR/shared-data"
 mkdir -p "$DEST_UDD" "$SHARED_DATA_DIR"
